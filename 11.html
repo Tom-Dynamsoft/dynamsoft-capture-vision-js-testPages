@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamsoft Capture Vision for the Web Step by Step</title>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-capture-vision-bundle@2.2.3000/dist/dcv.bundle.js"></script>
+
+  </head>
+  <body>
+    <div
+      id="div-ui-container"
+      style="width: 70vw; height: 40vh; margin-top: 3vh"
+    ></div>
+    <div
+      id="results"
+      style="width: 100%; min-height: 10vh; font-size: 3vh; overflow: auto"
+    ></div>
+    <script>
+      Dynamsoft.License.LicenseManager.initLicense(
+        "DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9"
+      );
+      Dynamsoft.Core.CoreModule.loadWasm(["DDN", "DBR", "DLR"]);
+      const resultsContainer = document.querySelector("#results");
+      (async function () {
+        /**
+         * Prepare the image source
+         */
+        const cameraViewContainer = document.querySelector("#div-ui-container");
+        const view = await Dynamsoft.DCE.CameraView.createInstance();
+        cameraEnhancer = await Dynamsoft.DCE.CameraEnhancer.createInstance(
+          view
+        );
+        cameraViewContainer.append(view.getUIElement());
+
+        router = await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+
+        /**
+         * Connect the image source
+         */
+        router.setInput(cameraEnhancer);
+        /**
+         * Define a result receiver
+         */
+        resultReceiver = new Dynamsoft.CVR.CapturedResultReceiver();
+        resultReceiver.onCapturedResultReceived = (result) => {
+          normalizedImages = result.items.filter(
+            (item) =>
+              item.type ===
+              Dynamsoft.Core.EnumCapturedResultItemType.CRIT_NORMALIZED_IMAGE
+          );
+          for (let image of normalizedImages) {
+            let canvas = image.toCanvas();
+            let cvs = document.body.childNodes.item(
+              document.body.childNodes.length - 1
+            );
+            if (canvas.width > 200 && canvas.height > 150) {
+              if (cvs.tagName == "CANVAS") document.body.removeChild(cvs);
+              canvas.style.width = "70vw";
+              document.body.appendChild(canvas);
+            }
+          }
+        };
+        /**
+         * Register the result receiver
+         */
+        router.addResultReceiver(resultReceiver);
+        /**
+         * Start image processing
+         */
+        router.startCapturing("DetectAndNormalizeDocument_Default");
+        /**
+         * Activate the image source.
+         */
+        cameraEnhancer.open();
+      })();
+    </script>
+  </body>
+</html>

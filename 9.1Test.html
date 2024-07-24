@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamsoft Capture Vision for the Web Step by Step</title>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-capture-vision-bundle@2.2.3000/dist/dcv.bundle.js"></script>
+
+  </head>
+  <body>
+    <h1>DBR v9.6.32</h1>
+    <div
+      id="div-ui-container"
+      style="width: 70vw; height: 40vh; margin-top: 3vh"
+    ></div>
+    <div
+      id="results"
+      style="width: 100%; min-height: 10vh; font-size: 3vh; overflow: auto"
+    ></div>
+    <script>
+      /** The old way to license is only to pass the license key. */
+      Dynamsoft.DBR.BarcodeScanner.license =
+        "DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9";
+      /** The only WASM to load then is dbr.wasm. */
+      try {
+        Dynamsoft.DBR.BarcodeScanner.loadWasm();
+      } catch (e) {
+        if (e.message.indexOf("Failed to connect")) {
+          console.log("failed to connect");
+        } else if (e.message.indexOf("Expired")) {
+          console.log("expired");
+        }
+      }
+      const resultsContainer = document.querySelector("#results");
+      (async function () {
+        /**
+         * Prepare the image source
+         * BarcodeScanner itself has the image source built-in, so no need to create one.
+         */
+        try {
+          scanner = await Dynamsoft.DBR.BarcodeScanner.createInstance();
+        } catch (e) {
+          if (e.message.indexOf("Failed to connect") != -1) {
+            console.log("failed to connect");
+            return;
+          } else if (e.message.indexOf("license has expired") != -1) {
+            console.log("expired");
+            return;
+          }
+        }
+        document
+          .getElementById("div-ui-container")
+          .appendChild(scanner.getUIElement());
+        /**
+         * Connect the image source
+         */
+        // NOT REQUIRED in V9 As BarcodeScanner itself has the image source, it controls both.
+
+        /**
+         * Define a result receiver
+         * BarcodeScanner itelf has built-in result receivers onFrameRead
+         */
+        scanner.onUniqueRead = (results) => {
+          if (results.length > 0) console.log(results);
+        };
+        scanner.onFrameRead = (result) => {
+          let barcodes = result;
+          for (let item of barcodes) {
+            resultsContainer.textContent = `${item.barcodeFormatString}: ${item.barcodeText}`;
+          }
+        };
+        /**
+         * Register the result receiver
+         */
+        // NOT REQUIRED in V9 as BarcodeScanner itself comes with built-in receivers.
+        /**
+         * Start image processing
+         */
+        /**
+         * Activate the image source.
+         * In v9, show() does both at the same time.
+         */
+        await scanner.show();
+      })();
+    </script>
+  </body>
+</html>

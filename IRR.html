@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamsoft Capture Vision for the Web Step by Step</title>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader@10.2.10/dist/dbr.bundle.js"></script>
+  </head>
+  <body>
+    <div
+      id="div-ui-container"
+      style="width: 90vw; height: 80vh; margin-top: 3vh"
+    ></div>
+    <div
+      id="results"
+      style="width: 100%; min-height: 10vh; font-size: 3vh; overflow: auto"
+    ></div>
+    <script>
+      Dynamsoft.License.LicenseManager.initLicense(
+        "DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9"
+      );
+      Dynamsoft.Core.CoreModule.loadWasm(["DDN", "DBR", "DLR"]);
+      const resultsContainer = document.querySelector("#results");
+      const imgManager = new Dynamsoft.Utility.ImageManager();
+      let layer = null;
+      (async function () {
+        /**
+         * Prepare the image source
+         */
+        const cameraViewContainer = document.querySelector("#div-ui-container");
+        view = await Dynamsoft.DCE.CameraView.createInstance();
+        cameraEnhancer = await Dynamsoft.DCE.CameraEnhancer.createInstance(
+          view
+        );
+        cameraViewContainer.append(view.getUIElement());
+        layer = view.createDrawingLayer();
+        /**
+         * Prepare The code parser.
+         */
+        await Dynamsoft.DCP.CodeParserModule.loadSpec("MRTD_TD3_PASSPORT");
+        parser = await Dynamsoft.DCP.CodeParser.createInstance();
+
+        router = await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+
+        /**
+         * Connect the image source
+         */
+        router.setInput(cameraEnhancer);
+        /**
+         * Define a result receiver
+         */
+        resultReceiver = new Dynamsoft.CVR.CapturedResultReceiver();
+        resultReceiver.onCapturedResultReceived = (result) => {
+          let textlines = result.items.filter(
+            (item) =>
+              item.type ===
+              Dynamsoft.Core.EnumCapturedResultItemType.CRIT_TEXT_LINE
+          );
+          for (let line of textlines) parseMRZ(line.text);
+          normalizedImages = result.items.filter(
+            (item) =>
+              item.type ===
+              Dynamsoft.Core.EnumCapturedResultItemType.CRIT_NORMALIZED_IMAGE
+          );
+          for (let image of normalizedImages) {
+            let canvas = image.toCanvas();
+            let cvs = document.body.childNodes.item(
+              document.body.childNodes.length - 1
+            );
+            if (canvas.width > 200 && canvas.height > 150) {
+              if (cvs.tagName == "CANVAS") document.body.removeChild(cvs);
+              canvas.style.width = "70vw";
+              document.body.appendChild(canvas);
+            }
+          }
+        };
+        /**
+         * Register the result receiver
+         */
+        router.addResultReceiver(resultReceiver);
+
+        IRReceiver = new Dynamsoft.CVR.IntermediateResultReceiver();
+
+        // IRReceiver.onTaskResultsReceived = (result, info) => { let section = getSectionString(info.sectionType);let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+        //   console.log(`Task name: ${info.taskName}`);
+        //   console.log(
+        //     `Task result units count: ${result.intermediateResultUnits.length}`
+        //   );
+        // };
+
+        Dynamsoft.DCE.DrawingStyleManager.updateDrawingStyle(4, {
+          // fillStyle: "rgba(100, 75, 245, 0.3)",
+          // fontFamily: "sans-serif",
+          // fontSize: 25,
+          lineWidth: 20,
+          //paintMode: "strokeAndFill",
+          //strokeStyle: "rgba(73, 173, 245, 1)"
+        });
+
+        IRReceiver.onColourImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "ColourImage",
+            true
+          );
+        };
+
+        IRReceiver.onScaledDownColourImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "ScaledDownColourImage",
+            true
+          );
+        };
+
+        IRReceiver.onGrayscaleImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "GrayscaleImage",
+            true
+          );
+        };
+
+        IRReceiver.onTransformedGrayscaleImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "TransformedGrayscaleImage",
+            true
+          );
+        };
+
+        IRReceiver.onPredetectedRegionsReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          if (result.predetectedRegions.length > 0) {
+            for (key in result.predetectedRegions) {
+              let item = new Dynamsoft.DCE.QuadDrawingItem(
+                {
+                  points: result.predetectedRegions[key].location.points,
+                },
+                4
+              );
+              layer.addDrawingItems([item]);
+            }
+          }
+        };
+
+        IRReceiver.onEnhancedGrayscaleImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "EnhancedGrayscaleImage",
+            true
+          );
+        };
+        IRReceiver.onBinaryImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "BinaryImage",
+            true
+          );
+        };
+        IRReceiver.onTextureDetectionResultUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+        };
+        IRReceiver.onTextureRemovedGrayscaleImageUnitReceived = (
+          result,
+          info
+        ) => {
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "TextureRemovedGrayscaleImage",
+            true
+          );
+        };
+        IRReceiver.onTextureRemovedBinaryImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "TextureRemovedBinaryImage",
+            true
+          );
+        };
+        IRReceiver.onContoursUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+        };
+        IRReceiver.onLineSegmentsUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+        };
+        IRReceiver.onTextZonesUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+        };
+        IRReceiver.onTextRemovedBinaryImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "TextRemovedBinaryImage",
+            true
+          );
+        };
+        IRReceiver.onLongLinesUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+        };
+        IRReceiver.onCornersUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+        };
+        IRReceiver.onCandidateQuadEdgesUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+        };
+        IRReceiver.onCandidateBarcodeZonesUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+        };
+        IRReceiver.onDeformationResistedBarcodeImageUnitReceived = (
+          result,
+          info
+        ) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum +
+              "_" +
+              section +
+              "_" +
+              "DeformationResistedBarcodeImage",
+            true
+          );
+        };
+        IRReceiver.onComplementedBarcodeImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "ComplementedBarcodeImage",
+            true
+          );
+        };
+        IRReceiver.onScaledUpBarcodeImageUnitReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          imgManager.saveToFile(
+            result.imageData,
+            sequencenum + "_" + section + "_" + "ScaledUpBarcodeImage",
+            true
+          );
+        };
+
+        IRReceiver.onLocalizedBarcodesReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          if (result.localizedBarcodes.length > 0) {
+            for (key in result.localizedBarcodes) {
+              let item = new Dynamsoft.DCE.QuadDrawingItem(
+                {
+                  points: result.localizedBarcodes[key].location.points,
+                },
+                11
+              );
+              layer.addDrawingItems([item]);
+            }
+          }
+        };
+        IRReceiver.onDecodedBarcodesReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          if (result.decodedBarcodes.length > 0) {
+            for (key in result.decodedBarcodes) {
+              console.log(
+                `format: ${result.decodedBarcodes[key].formatString}`
+              );
+              console.log(`text: ${result.decodedBarcodes[key].text}`);
+            }
+          }
+        };
+        IRReceiver.onLocalizedTextLinesReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          if (result.localizedTextLines.length > 0) {
+            for (key in result.localizedTextLines) {
+              let item = new Dynamsoft.DCE.QuadDrawingItem(
+                {
+                  points: result.localizedTextLines[key].location.points,
+                },
+                10
+              );
+              layer.addDrawingItems([item]);
+            }
+          }
+        };
+        IRReceiver.onRecognizedTextLinesReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          if (result.recognizedTextLines.length > 0) {
+            for (key in result.recognizedTextLines) {
+              console.log(`textline: ${result.recognizedTextLines[key].text}`);
+            }
+          }
+        };
+        IRReceiver.onDetectedQuadsReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          if (result.detectedQuads.length > 0) {
+            for (key in result.detectedQuads) {
+              let item = new Dynamsoft.DCE.QuadDrawingItem(
+                {
+                  points: result.detectedQuads[key].location.points,
+                },
+                9
+              );
+              layer.addDrawingItems([item]);
+            }
+          }
+        };
+        IRReceiver.onNormalizedImagesReceived = (result, info) => {
+          let section = getSectionString(info.sectionType);
+          let sequencenum = getSequenceNum(info.sectionType, result.unitType);
+          console.log(section + `_type: ${result.unitType}`);
+          //console.log(info);
+        };
+
+        IRManager = router.getIntermediateResultManager();
+        IRManager.addResultReceiver(IRReceiver);
+
+        /**
+         * MRZ is not a built-in template, therefore we need to use a customized one
+         */
+        // await router.initSettings(
+        //   "DDN-PresetTemplates.json"
+        // );
+        /**
+         * Use the customized template for passport MRZ
+         */
+        router.startCapturing("DetectDocumentBoundaries_Default");
+        //router.startCapturing("ReadSingleBarcode");
+        // router.startCapturing("DoThreeThings");
+        cameraEnhancer.singleFrameMode = "image";
+        cameraEnhancer.open();
+        cameraEnhancer.on("singleFrameAcquired", () => {
+          setTimeout(() => {
+            view.setScanLaserVisible(false);
+          }, 0);
+        });
+      })();
+      async function parseMRZ(passportMRZStr) {
+        let parsedResultItem = await parser.parse(passportMRZStr);
+        console.log("parsedResultItem: ", parsedResultItem);
+        if (!parsedResultItem.exception) {
+          let parsedResult = JSON.parse(parsedResultItem.jsonString);
+          let parsedLines = parsedResult.ResultInfo;
+          resultsContainer.innerHTML = "";
+          parsedLines.forEach((element) => {
+            resultsContainer.innerHTML += `${element.FieldName}<br><br>`;
+            element.ChildFields[0].forEach((childElement) => {
+              resultsContainer.innerHTML += `${childElement.FieldName}: ${childElement.Value}<br>`;
+            });
+          });
+        } else {
+          console.log(parsedResultItem.exception);
+        }
+      }
+      function getSectionString(type) {
+        switch (type) {
+          case 0:
+            return "NULL";
+          case 1:
+            return "REGION_PREDETECTION";
+          case 2:
+            return "BARCODE_LOCALIZATION";
+          case 3:
+            return "BARCODE_DECODING";
+          case 4:
+            return "TEXT_LINE_LOCALIZATION";
+          case 5:
+            return "TEXT_LINE_RECOGNITION";
+          case 6:
+            return "DOCUMENT_DETECTION";
+          case 7:
+            return "DOCUMENT_NORMALIZATION";
+        }
+      }
+      function getSequenceNum(type, unitType) {
+        switch (type) {
+          case 0:
+            return "NULL";
+          case 1:
+            switch (unitType) {
+              case 1:
+                return "1_10";
+              case 2:
+                return "1_15";
+              case 4:
+                return "1_20";
+              case 8:
+                return "1_30";
+            }
+            return "unknown";
+          case 2:
+          case 4:
+          case 6:
+            switch (unitType) {
+              case 1:
+                return "2_10";
+              case 2:
+                return "2_15";
+              case 4:
+                return "2_20";
+              case 8:
+                return "2_30";
+              case 16:
+                return "2_40";
+              case 64:
+                return "2_50";
+              case 256:
+                return "2_60";
+              case 512:
+                return "2_65";
+              case 8192:
+                return "2_90";
+            }
+            return "unknown";
+          case 3:
+            switch (unitType) {
+              case 1:
+                return "3_10";
+              case 4:
+                return "3_20";
+              case 8:
+                return "3_30";
+              case 65536:
+                return "3_60";
+              case 131072:
+                return "3_40";
+              case 262144:
+                return "3_50";
+            }
+            return "unknown";
+          case 5:
+            switch (unitType) {
+              case 1:
+                return "3_10";
+              case 4:
+                return "3_20";
+              case 8:
+                return "3_30";
+            }
+            return "unknown";
+          case 7:
+            switch (unitType) {
+              case 67108864:
+                return "3_80";
+            }
+            return "unknown";
+        }
+      }
+    </script>
+  </body>
+</html>

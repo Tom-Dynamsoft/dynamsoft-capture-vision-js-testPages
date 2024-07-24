@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamsoft Capture Vision for the Web Step by Step</title>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-capture-vision-bundle@2.2.3000/dist/dcv.bundle.js"></script>
+
+  </head>
+  <body>
+  <button id='btnopen'>Open</button>
+  <button id='btnPhoto'>Take Photo</button>
+    <div
+      id="div-ui-container" 
+      style="width: 70vw; height: 40vh; margin-top: 3vh"
+    ></div>
+	
+	
+	<div style="width: 70vw; height: 40vh; margin-top: 3vh;position:relative;">
+		<div class="dce-video-container" style="position:absolute;left:0;top:0;width:100%;height:100%;"></div>
+		<div class="dce-scanarea" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
+			<div class="dce-scanlight" style="display:none;position:absolute;width:100%;height:3%;border-radius:50%;box-shadow:0px 0px 2vw 1px #00e5ff;background:#fff;animation:3s infinite dce-scanlight;user-select:none;"></div>
+		</div>
+	</div>
+	
+	
+	<div id="enhancerUIContainer" style="width: 70vw; height: 40vh; margin-top: 3vh" >
+	<div class="dce-image-container" style="width:100%;height:100%;"></div>
+	</div>
+<script>
+    // Create 'ImageEditorView' instance and pass an element as its UI.
+
+	(async function () {
+		IEV = await Dynamsoft.DCE.ImageEditorView.createInstance(document.getElementById("enhancerUIContainer"));
+		Dynamsoft.License.LicenseManager.initLicense(
+		"DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9"
+		);
+		/**
+		* Prepare the image source
+		*/
+		cameraViewContainer = document.querySelector("#div-ui-container");
+		//const view = await Dynamsoft.DCE.CameraView.createInstance('https://cdn.jsdelivr.net/npm/dynamsoft-camera-enhancer@4.0.0/dist/dce.ui.html');
+		view = await Dynamsoft.DCE.CameraView.createInstance();
+		cameraEnhancer = await Dynamsoft.DCE.CameraEnhancer.createInstance(
+			view
+		);
+		cameraViewContainer.append(view.getUIElement());
+	})();
+
+	btnopen.onclick = function(){
+        cameraEnhancer.open();
+	};
+	btnPhoto.onclick = function(){
+		cameraEnhancer.takePhoto(
+			dceFrame=> {
+				document.body.appendChild(dceFrame.toCanvas()); 
+				cameraEnhancer.open();
+			}
+		);
+	};
+    </script>
+  </body>
+</html>

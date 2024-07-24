@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamsoft Capture Vision for the Web Step by Step</title>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-capture-vision-bundle@2.2.3000/dist/dcv.bundle.js"></script>
+
+  </head>
+  <body>
+    <h1>DBR v10.0.20</h1>
+    <div
+      id="div-ui-container"
+      style="width: 70vw; height: 40vh; margin-top: 3vh"
+    ></div>
+    <div
+      id="results"
+      style="width: 100%; min-height: 10vh; font-size: 3vh; overflow: auto"
+    ></div>
+    <img id="output" />
+    <script>
+      try {
+        Dynamsoft.License.LicenseManager.initLicense(
+          "DLS2eyJoYW5kc2hha2VDb2RlIjoiMjE2OTk4LVRYbFhaV0pRY205cSIsIm1haW5TZXJ2ZXJVUkwiOiJodHRwczovL21sdHMuZHluYW1zb2Z0LmNvbSIsIm9yZ2FuaXphdGlvbklEIjoiMjE2OTk4Iiwic3RhbmRieVNlcnZlclVSTCI6Imh0dHBzOi8vc2x0cy5keW5hbXNvZnQuY29tIiwiY2hlY2tDb2RlIjotNDEzNjY4MDQ4fQ=="
+        );
+      } catch (e) {
+        (e) => console.log(e);
+      }
+      (async () => {
+        try {
+          await Dynamsoft.Core.CoreModule.loadWasm(["DBR"]);
+        } catch (e) {
+          (e) => console.log(e);
+        }
+      })();
+      const resultsContainer = document.querySelector("#results");
+      function processFile(file) {
+        var reader = new FileReader();
+        reader.addEventListener("loadend", function (arg) {
+          var src_image = new Image();
+          src_image.onload = function () {
+            var canvas = document.createElement("canvas");
+            canvas.height = src_image.height;
+            canvas.width = src_image.width;
+            var ctx = canvas.getContext("2d");
+            ctx.drawImage(src_image, 0, 0);
+            var imageData = canvas.toDataURL("image/png");
+            output.src = imageData;
+            //uploadCanvas(imageData);
+          };
+          src_image.src = this.result;
+        });
+
+        reader.readAsDataURL(file);
+      }
+      (async function () {
+        /**
+         * Prepare the image source
+         */
+        const cameraViewContainer = document.querySelector("#div-ui-container");
+        const view = await Dynamsoft.DCE.CameraView.createInstance();
+
+        try {
+          cameraEnhancer = await Dynamsoft.DCE.CameraEnhancer.createInstance(
+            view
+          );
+        } catch (e) {
+          (e) => console.log(e);
+        }
+        cameraViewContainer.append(view.getUIElement());
+
+        try {
+          router = await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+        } catch (e) {
+          (e) => console.log(e);
+        }
+        /**
+         * Connect the image source
+         */
+        router.setInput(cameraEnhancer);
+        /**
+         * Define a result receiver
+         */
+        resultReceiver = new Dynamsoft.CVR.CapturedResultReceiver();
+        const imgManager = new Dynamsoft.Utility.ImageManager();
+        resultReceiver.onCapturedResultReceived = (result) => {
+          let barcodes = result.items.filter(
+            (item) =>
+              item.type ===
+              Dynamsoft.Core.EnumCapturedResultItemType.CRIT_BARCODE
+          );
+          for (let item of barcodes) {
+            resultsContainer.textContent = `${item.formatString}: ${item.text}`;
+          }
+          if (barcodes.length > 0) {
+            let image = result.items.filter(
+              (item) =>
+                item.type ===
+                Dynamsoft.Core.EnumCapturedResultItemType.CRIT_ORIGINAL_IMAGE
+            )[0];
+
+            imgManager
+              .saveToFile(image.imageData, "withBarcode.png")
+              .then((file) => processFile(file));
+          }
+        };
+        /**
+         * Register the result receiver
+         */
+        router.addResultReceiver(resultReceiver);
+        let settings = await router.getSimplifiedSettings("ReadSingleBarcode");
+        settings.capturedResultItemTypes |=
+          Dynamsoft.Core.EnumCapturedResultItemType.CRIT_ORIGINAL_IMAGE;
+        await router.updateSettings("ReadSingleBarcode", settings);
+        await router.startCapturing("ReadSingleBarcode");
+        /**
+         * Start image processing
+         */
+        router.startCapturing("ReadSingleBarcode");
+        /**
+         * Activate the image source.
+         */
+        cameraEnhancer.open();
+      })();
+    </script>
+  </body>
+</html>

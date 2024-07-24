@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamsoft Capture Vision for the Web Step by Step</title>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-core@3.0.32/dist/core.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-license@3.0.20/dist/license.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-utility@1.0.21/dist/utility.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-document-normalizer@2.0.21/dist/ddn.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-capture-vision-router@2.0.32/dist/cvr.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-camera-enhancer@4.0.1/dist/dce.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-code-parser@2.0.20/dist/dcp.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-barcode-reader@10.0.20/dist/dbr.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-label-recognizer@3.0.30/dist/dlr.js"></script>
+  </head>
+  <body>
+    <div
+      id="div-ui-container"
+      style="width: 70vw; height: 40vh; margin-top: 3vh"
+    ></div>
+    <div
+      id="results"
+      style="width: 100%; min-height: 10vh; font-size: 3vh; overflow: auto"
+    ></div>
+    <script>
+      Dynamsoft.License.LicenseManager.initLicense(
+        "DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9"
+      );
+      Dynamsoft.Core.CoreModule.loadWasm(["DDN", "DBR", "DLR"]);
+      const resultsContainer = document.querySelector("#results");
+      (async function () {
+        /**
+         * Prepare the image source
+         */
+        const cameraViewContainer = document.querySelector("#div-ui-container");
+        const view = await Dynamsoft.DCE.CameraView.createInstance();
+        cameraEnhancer = await Dynamsoft.DCE.CameraEnhancer.createInstance(
+          view
+        );
+        Dynamsoft.DCE.CameraEnhancer.onWarning = warning => console.log(warning);
+        cameraViewContainer.append(view.getUIElement());
+        /**
+         * Prepare The code parser.
+         */
+        await Dynamsoft.DCP.CodeParserModule.loadSpec("MRTD_TD3_PASSPORT");
+        parser = await Dynamsoft.DCP.CodeParser.createInstance();
+
+        router = await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+
+        /**
+         * Connect the image source
+         */
+        router.setInput(cameraEnhancer);
+        /**
+         * Define a result receiver
+         */
+        resultReceiver = new Dynamsoft.CVR.CapturedResultReceiver();
+        resultReceiver.onOriginalImageResultReceived = (result) => {
+          console.log(result);
+        };
+        resultReceiver.onNormalizedImagesReceived = (result) => {
+          console.log(result);
+        };
+        resultReceiver.onDecodedBarcodesReceived = (result) => {
+          console.log(result);
+        };
+        resultReceiver.onRecognizedTextLinesReceived = (result) => {
+          console.log(result);
+        };
+        resultReceiver.onDetectedQuadsReceived = (result) => {
+          console.log(result);
+        };
+        resultReceiver.onParsedResultsReceived = (result) => {
+          console.log(result);
+        };
+        resultReceiver.onCapturedResultReceived = (result) => {
+          let textlines = result.items.filter(
+            (item) =>
+              item.type ===
+              Dynamsoft.Core.EnumCapturedResultItemType.CRIT_TEXT_LINE
+          );
+          for (let line of textlines) parseMRZ(line.text);
+          normalizedImages = result.items.filter(
+            (item) =>
+              item.type ===
+              Dynamsoft.Core.EnumCapturedResultItemType.CRIT_NORMALIZED_IMAGE
+          );
+          for (let image of normalizedImages) {
+            let canvas = image.toCanvas();
+            let cvs = document.body.childNodes.item(
+              document.body.childNodes.length - 1
+            );
+            if (canvas.width > 200 && canvas.height > 150) {
+              if (cvs.tagName == "CANVAS") document.body.removeChild(cvs);
+              canvas.style.width = "70vw";
+              document.body.appendChild(canvas);
+            }
+          }
+        };
+        /**
+         * Register the result receiver
+         */
+        router.addResultReceiver(resultReceiver);
+
+        IRReceiver = new Dynamsoft.CVR.IntermediateResultReceiver();
+
+        /** ISSUE:
+         * only triggered on the first task of many in a CaptureVisionTemplate??
+         * fixed in CVR 2.0.32
+         */
+        IRReceiver.onTaskResultsReceived = (result, info) => {
+          console.log(`Task name: ${info.taskName}`);
+          console.log(
+            `Task result units count: ${result.intermediateResultUnits.length}`
+          );
+        };
+        IRReceiver.onPredetectedRegionsReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onLocalizedBarcodesReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onDecodedBarcodesReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onLocalizedTextLinesReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onRecognizedTextLinesReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onDetectedQuadsReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onNormalizedImagesReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onColourImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onScaledDownColourImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onGrayscaleImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onTransformedGrayscaleImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onEnhancedGrayscaleImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onBinaryImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onTextureDetectionResultUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onTextureRemovedGrayscaleImageUnitReceived = (
+          result,
+          info
+        ) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onTextureRemovedBinaryImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        /** ERROR
+         * cvr.js:11 Invalid array length, memory overload??? crashes the browser
+         * fixed in cvr 2.0.32
+         */
+        IRReceiver.onContoursUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onLineSegmentsUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onTextZonesUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onTextRemovedBinaryImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onLongLinesUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onCornersUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        /** ERROR!!!
+         * cvr.js:11 Cannot read properties of null (reading 'ptr')
+         * fixed in cvr 2.0.32
+         */
+        IRReceiver.onCandidateQuadEdgesUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onCandidateBarcodeZonesUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onScaledUpBarcodeImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onDeformationResistedBarcodeImageUnitReceived = (
+          result,
+          info
+        ) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRReceiver.onComplementedBarcodeImageUnitReceived = (result, info) => {
+          console.log(`type: ${result.unitType}`);
+          //console.log(info);
+        };
+        IRManager = router.getIntermediateResultManager();
+        IRManager.addResultReceiver(IRReceiver);
+
+        /**
+         * MRZ is not a built-in template, therefore we need to use a customized one
+         */
+        await router.initSettings(
+          "customized.json"
+        );
+        /**
+         * Use the customized template for passport MRZ
+         */
+        router.startCapturing("DoThreeThings");
+        cameraEnhancer.open();
+      })();
+      async function parseMRZ(passportMRZStr) {
+        let parsedResultItem = await parser.parse(passportMRZStr);
+        console.log("parsedResultItem: ", parsedResultItem);
+        if (!parsedResultItem.exception) {
+          let parsedResult = JSON.parse(parsedResultItem.jsonString);
+          let parsedLines = parsedResult.ResultInfo;
+          resultsContainer.innerHTML = "";
+          parsedLines.forEach((element) => {
+            resultsContainer.innerHTML += `${element.FieldName}<br><br>`;
+            element.ChildFields[0].forEach((childElement) => {
+              resultsContainer.innerHTML += `${childElement.FieldName}: ${childElement.Value}<br>`;
+            });
+          });
+        } else {
+          console.log(parsedResultItem.exception);
+        }
+      }
+    </script>
+  </body>
+</html>

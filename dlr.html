@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-core@3.0.32/dist/core.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-license@3.0.20/dist/license.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-utility@1.0.21/dist/utility.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-label-recognizer@3.0.30/dist/dlr.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-capture-vision-router@2.0.31/dist/cvr.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dynamsoft-camera-enhancer@4.0.1/dist/dce.js"></script>
+    <div id="cameraViewContainer" style="width: 100%; height: 60vh"></div>
+    <textarea
+      id="results"
+      style="width: 100%; min-height: 10vh; font-size: 3vmin; overflow: auto"
+      disabled
+    ></textarea>
+    <script>
+      Dynamsoft.License.LicenseManager.initLicense(
+        "DLS2eyJvcmdhbml6YXRpb25JRCI6IjIwMDAwMSJ9"
+      );
+      (async () => {
+        router = await Dynamsoft.CVR.CaptureVisionRouter.createInstance();
+
+        let view = await Dynamsoft.DCE.CameraView.createInstance();
+        cameraEnhancer = await Dynamsoft.DCE.CameraEnhancer.createInstance(
+          view
+        );
+        document
+          .querySelector("#cameraViewContainer")
+          .append(view.getUIElement());
+        router.setInput(cameraEnhancer);
+
+        const resultsContainer = document.querySelector("#results");
+        router.addResultReceiver({
+          onRecognizedTextLinesReceived: (result) => {
+            if (result.textLineResultItems.length > 0) {
+              resultsContainer.textContent = "";
+              for (let item of result.textLineResultItems) {
+                resultsContainer.textContent += `${item.text}\n`;
+              }
+            }
+          },
+        });
+
+        let filter = new Dynamsoft.Utility.MultiFrameResultCrossFilter();
+        filter.enableResultCrossVerification(
+          Dynamsoft.Core.EnumCapturedResultItemType.CRIT_BARCODE,
+          true
+        );
+        filter.enableResultDeduplication(
+          Dynamsoft.Core.EnumCapturedResultItemType.CRIT_BARCODE,
+          true
+        );
+        await router.addResultFilter(filter);
+        await router.initSettings(
+          "https://tst.dynamsoft.com/public/samples/dcvTemplates/readPassportMRZ.json"
+        );
+        await cameraEnhancer.open();
+        await router.startCapturing("passport-mrz");
+      })();
+    </script>
+  </body>
+</html>
